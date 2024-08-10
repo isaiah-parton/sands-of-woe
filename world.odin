@@ -1,10 +1,11 @@
 package game
 
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import "core:math"
 import "core:math/rand"
 import "core:math/linalg"
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:fmt"
 
@@ -280,9 +281,13 @@ set_cells_in_circle :: proc(world: ^World, center: [2]f32, radius: f32, what: Ce
 			}
 		}
 	}
+	wake_chunks_in_bounds(world, bounds)
+}
+
+wake_chunks_in_bounds :: proc(world: ^World, bounds: Bounds($T)) {
 	chunk_bounds: Bounds(int) = {
-		bounds.low / CHUNK_SIZE,
-		bounds.high / CHUNK_SIZE + 1,
+		linalg.array_cast(bounds.low, int) / CHUNK_SIZE,
+		linalg.array_cast(bounds.high, int) / CHUNK_SIZE + 1,
 	}
 	for y in chunk_bounds.low.y ..< chunk_bounds.high.y {
 		for x in chunk_bounds.low.x ..< chunk_bounds.high.x {

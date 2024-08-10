@@ -1,7 +1,7 @@
 package game
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 import rl "vendor:raylib"
 
 Widget_ID :: u32
