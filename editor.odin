@@ -112,9 +112,13 @@ update_editor :: proc(e: ^Editor) {
 
 		case .Polygon:
 		if !e.polygon.done {
-			snap_distance := f32(3) * game.camera.scale
+			
 			e.polygon.next_point = game.world_mouse_point
 			e.polygon.snap_to = nil
+			
+			snap_distance := f32(24) / game.camera.scale
+
+			// Axis lock
 			if rl.IsKeyDown(.LEFT_CONTROL) {
 				last_point := e.polygon.points[len(e.polygon.points) - 1]
 				diff := linalg.abs(last_point - e.polygon.next_point)
@@ -124,6 +128,7 @@ update_editor :: proc(e: ^Editor) {
 					e.polygon.next_point.x = last_point.x
 				}
 
+				// Snap to other points along the other axis
 				if rl.IsKeyDown(.LEFT_SHIFT) {
 					for point, p in e.polygon.points {
 						if diff.x > diff.y {
@@ -140,12 +145,17 @@ update_editor :: proc(e: ^Editor) {
 					}
 				}
 			}
+
+
+			// Snap to first point to complete the poly
 			if len(e.polygon.points) > 2 {
 				first_point := e.polygon.points[0]
 				if linalg.distance(e.polygon.next_point, first_point) < snap_distance {
 					e.polygon.next_point = first_point
 				}
 			}
+
+			// Place the next point
 			if !game.widget_hovered && rl.IsMouseButtonPressed(.LEFT) {
 				if len(e.polygon.points) > 2 && e.polygon.next_point == e.polygon.points[0] {
 					e.polygon.done = true
@@ -153,8 +163,11 @@ update_editor :: proc(e: ^Editor) {
 				append(&e.polygon.points, e.polygon.next_point)
 			}
 		} else {
-			if rl.IsKeyPressed(.B) {
-				// Calculate bounds
+
+			// Fill polygon
+			if rl.IsKeyPressed(.F) {
+
+				// Calculate polygon bounds
 				bounds: Bounds(f32) = {
 					{f32(game.world.width), f32(game.world.height)},
 					{0.0, 0.0},
@@ -164,6 +177,7 @@ update_editor :: proc(e: ^Editor) {
 					bounds.high = linalg.max(bounds.high, point)
 				}
 
+				// Check each cell in bounds
 				for y in int(bounds.low.y)..<int(bounds.high.y) {
 					for x in int(bounds.low.x)..<int(bounds.high.x) {
 						if check_point_vs_poly([2]f32{f32(x), f32(y)}, e.polygon.points[:]) {
@@ -172,10 +186,40 @@ update_editor :: proc(e: ^Editor) {
 					}
 				}
 
+				// Wake chunks
 				wake_chunks_in_bounds(&game.world, bounds)
+			}
 
-				clear(&e.polygon.points)
-				e.polygon.done = false
+			// Scale the polygon
+			delta_scale := rl.GetMouseWheelMove()
+			if delta_scale != 0 {
+
+				// Calculate polygon bounds
+				bounds: Bounds(f32) = {
+					{f32(game.world.width), f32(game.world.height)},
+					{0.0, 0.0},
+				}
+				for point in e.polygon.points {
+					bounds.low = linalg.min(bounds.low, point)
+					bounds.high = linalg.max(bounds.high, point)
+				}
+
+				center := bounds.low + bounds.high / 2
+
+				// Calculate transformation matrix
+				transform: matrix[2, 2]f32 = {
+					center.x, 0,
+					0, center.y,
+				}
+
+				transform *= matrix[2, 2]f32{
+					1 + delta_scale, 0,
+					0, 1 + delta_scale,
+				}
+
+				for &point in e.polygon.points {
+					point = transform * point
+				}
 			}
 		}
 		if rl.IsMouseButtonPressed(.RIGHT) {
@@ -183,6 +227,11 @@ update_editor :: proc(e: ^Editor) {
 			e.polygon.done = false
 		}
 	}
+}
+
+clear_polygon_tool :: proc(polygon: ^Polygon_Tool) {
+	clear(&polygon.points)
+	polygon.done = false
 }
 
 check_point_vs_tri :: proc(point, a, b, c: [2]f32) -> bool {
